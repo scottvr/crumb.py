@@ -4,7 +4,7 @@
 
 ## Features
 
-- **Automatic Path Tagging**: Inserts a `# src path: relative_path` comment in `.py` files, ensuring traceability.
+- **Automatic Path Tagging**: Inserts a `# crumb: relative_path` comment in `.py` files, ensuring traceability.
 - **Configurable Behavior**: Control logging verbosity, dry-run mode, backup creation, and ignore patterns.
 - **Backup Support**: Optionally creates backups with user-specified extensions before modifying files.
 - **.gitignore Handling**: Supports `.gitignore` parsing for excluding files, with the ability to override or supplement ignore patterns.
@@ -49,7 +49,7 @@ Tags all `.py` files in the current directory and subdirectories.
 ```bash
 usage: crumb.py [-h] [-p PATH] [--dry-run] [-v] [--backup EXT] [--ignore IGNORE | --no-ignore]
 
-Recursively insert a '# src path:' comment into .py files that don't already have it.
+Recursively insert a '# crumb:' comment into .py files that don't already have it.
 
 options:
   -h, --help            Show this help message and exit.
@@ -107,7 +107,7 @@ A typical tagged file will look like this:
 ```python
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# src path: sub/dir/path/name.py
+# crumb: sub/dir/path/name.py
 
 import os
 

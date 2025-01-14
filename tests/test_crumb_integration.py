@@ -17,7 +17,7 @@ def test_insert_path_marker():
         # Verify the marker was added
         with open(temp_file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
-        assert lines[0].startswith("# src path:")
+        assert lines[0].startswith("# crumb:")
         assert "print('Hello, world!')" in lines[-1]
     finally:
         os.remove(temp_file_path)

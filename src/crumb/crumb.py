@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Recursively insert a '# src path:' comment into .py files that don't already have it."
+        description="Recursively insert a '# crumb:' comment into .py files that don't already have it."
     )
     parser.add_argument(
         "-p", "--path",
@@ -99,7 +99,7 @@ def should_ignore(file_path, root_path, spec):
 
 def find_insertion_index(lines):
     """
-    Find the best insertion index for the '# src path:' line.
+    Find the best insertion index for the '# crumb:' line.
     We'll skip over:
       - Shebang (#!)
       - Coding line (# -*- coding: ...)
@@ -114,8 +114,8 @@ def find_insertion_index(lines):
     for i, line in enumerate(lines):
         stripped = line.strip()
 
-        # Check for existing '# src path:'
-        if "# src path:" in stripped:
+        # Check for existing '# crumb:'
+        if "# crumb:" in stripped:
             return None  # Skip; already present
 
         # Check for shebang
@@ -150,7 +150,7 @@ def find_insertion_index(lines):
 
 def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backup_ext=None):
     """
-    Insert the line '# src path: relative_path' at the appropriate place
+    Insert the line '# crumb: relative_path' at the appropriate place
     if the file doesn't already have it in the top portion.
     Optionally creates a backup file before modifying.
     Returns True if we modified the file, else False.
@@ -173,7 +173,7 @@ def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backu
         logger.info(f"Skipping {file_path}: already has marker or no insertion point.")
         return False
 
-    marker_line = f"# src path: {rel_path}\n"
+    marker_line = f"# crumb: {rel_path}\n"
     if verbose:
         logger.debug(f"Inserting marker into {file_path} at line {idx} (dry_run={dry_run}).")
 
