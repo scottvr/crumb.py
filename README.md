@@ -15,9 +15,9 @@
 `crumb` is a standalone script. Simply download or clone the repository:
 
 ```bash
-git clone <repository-url>
-cd <repository-directory>
-chmod +x crumb.py
+git clone https://github.com/scottvr/crumb.py
+cd crumb.py/src/crumb
+python crumb.py
 ```
 
 Ensure Python 3 is installed on your system (`crumb` requires Python 3.6+).
