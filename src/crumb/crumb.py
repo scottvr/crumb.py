@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Recursively insert a '# crumb:' comment into .py files that don't already have it."
+        description="Recursively insert a '# crumb:' comment into files that don't already have it."
     )
     parser.add_argument(
         "-p", "--path",
@@ -42,6 +42,11 @@ def parse_args():
         "--backup",
         metavar="EXT",
         help="Backup files with the given extension before modifying (e.g., '.bak' or '.orig')."
+    )
+    parser.add_argument(
+        "--all-ext",
+        action="append",
+        help="Additional file extensions to process (e.g., '.js', '.txt'). Can be used multiple times."
     )
 
     ignore_group = parser.add_mutually_exclusive_group()
@@ -211,14 +216,27 @@ def main():
     if args.verbose:
         logger.setLevel(logging.DEBUG)
 
+    # Set up the list of file extensions to process
+    extensions = [".py"]  # Always include Python files
+    if args.all_ext:
+        for ext in args.all_ext:
+            # Make sure extension starts with a dot
+            if not ext.startswith("."):
+                ext = "." + ext
+            extensions.append(ext)
+        if args.verbose:
+            logger.debug(f"Processing files with extensions: {extensions}")
+
     updated_count = 0
     skipped_count = 0
     total_files = 0
 
     for root, dirs, files in os.walk(start_dir):
         for file in files:
-            if not file.endswith(".py"):
+            # Check if file has any of the target extensions
+            if not any(file.endswith(ext) for ext in extensions):
                 continue
+                
             file_path = os.path.join(root, file)
             total_files += 1
 
@@ -242,7 +260,7 @@ def main():
 
     # Summary
     logger.info("\n=== Summary ===")
-    logger.info(f"Total .py files considered: {total_files}")
+    logger.info(f"Total files considered: {total_files}")
     logger.info(f"Files updated: {updated_count}")
     logger.info(f"Files skipped: {skipped_count}")
     if args.dry_run:
