@@ -48,6 +48,11 @@ def parse_args():
         action="append",
         help="Additional file extensions to process (e.g., '.js', '.txt'). Can be used multiple times."
     )
+    parser.add_argument(
+        "--absolute",
+        action="store_true",
+        help="Use absolute file paths in the crumb tag instead of relative paths."
+    )
 
     ignore_group = parser.add_mutually_exclusive_group()
     ignore_group.add_argument(
@@ -153,14 +158,18 @@ def find_insertion_index(lines):
 
     return insertion_index
 
-def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backup_ext=None):
+def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backup_ext=None, use_absolute=False):
     """
-    Insert the line '# crumb: relative_path' at the appropriate place
+    Insert the line '# crumb: path' at the appropriate place
     if the file doesn't already have it in the top portion.
+    Path can be relative or absolute based on the use_absolute parameter.
     Optionally creates a backup file before modifying.
     Returns True if we modified the file, else False.
     """
-    rel_path = os.path.relpath(file_path, start_dir)
+    if use_absolute:
+        path = os.path.abspath(file_path)
+    else:
+        path = os.path.relpath(file_path, start_dir)
 
     try:
         with io.open(file_path, "r", encoding="utf-8") as f:
@@ -178,7 +187,7 @@ def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backu
         logger.info(f"Skipping {file_path}: already has marker or no insertion point.")
         return False
 
-    marker_line = f"# crumb: {rel_path}\n"
+    marker_line = f"# crumb: {path}\n"
     if verbose:
         logger.debug(f"Inserting marker into {file_path} at line {idx} (dry_run={dry_run}).")
 
@@ -215,6 +224,8 @@ def main():
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
+        if args.absolute:
+            logger.debug("Using absolute paths for crumb tags.")
 
     # Set up the list of file extensions to process
     extensions = [".py"]  # Always include Python files
@@ -251,7 +262,8 @@ def main():
                 start_dir=start_dir,
                 dry_run=args.dry_run,
                 verbose=args.verbose,
-                backup_ext=args.backup
+                backup_ext=args.backup,
+                use_absolute=args.absolute
             )
             if modified:
                 updated_count += 1
