@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+# crumb: src/crumb/crumb.py
 import os
 import re
 import argparse
@@ -336,8 +336,7 @@ def main():
             if modified:
                 if had_crumb and args.replace:
                     replaced_count += 1
-                else:
-                    updated_count += 1
+                updated_count += 1
             else:
                 skipped_count += 1
 
@@ -352,12 +351,11 @@ def main():
         logger.info("Dry run mode was ON (no files were actually modified).")
 
             
-            if modified:
-                if had_crumb and args.replace:
-                    replaced_count += 1
-                else:
-                    updated_count += 1
-            else:
+        if modified:
+            if had_crumb and args.replace:
+                replaced_count += 1
+            updated_count += 1
+        else:
                 skipped_count += 1
 
     # Summary
@@ -370,10 +368,10 @@ def main():
     if args.dry_run:
         logger.info("Dry run mode was ON (no files were actually modified).")
 
-            if modified:
-                updated_count += 1
-            else:
-                skipped_count += 1
+        if modified:
+            updated_count += 1
+        else:
+            skipped_count += 1
 
     # Summary
     logger.info("\n=== Summary ===")

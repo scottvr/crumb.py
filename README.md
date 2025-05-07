@@ -1,3 +1,4 @@
+# crumb: README.md
 # crumb
 
 `crumb` is a Python utility for recursively tagging `.py` files with a comment near the top, marking their relative path at the time of tagging. This is particularly useful when files that belong in structured directories (e.g., `sub/dir/path/name.py`) end up in a flat, non-hierarchical space, enabling you to trace their original locations—*as long as you tag them beforehand*.
