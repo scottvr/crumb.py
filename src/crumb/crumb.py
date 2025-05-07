@@ -53,6 +53,16 @@ def parse_args():
         action="store_true",
         help="Use absolute file paths in the crumb tag instead of relative paths."
     )
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="Replace existing crumb tags with new ones instead of skipping those files."
+    )
+    parser.add_argument(
+        "--unix",
+        action="store_true",
+        help="Use Unix-style (forward slash) path separators, even on Windows."
+    )
 
     ignore_group = parser.add_mutually_exclusive_group()
     ignore_group.add_argument(
@@ -107,13 +117,15 @@ def should_ignore(file_path, root_path, spec):
         return False
 
 
-def find_insertion_index(lines):
+def find_insertion_index(lines, replace=False):
     """
     Find the best insertion index for the '# crumb:' line.
     We'll skip over:
       - Shebang (#!)
       - Coding line (# -*- coding: ...)
       - A possible top-level docstring (single/double quotes, any indentation)
+      
+    If replace=True, return the index of any existing crumb tag to be replaced
     """
     insertion_index = 0  # Candidate for insertion
     in_docstring = False
@@ -126,7 +138,10 @@ def find_insertion_index(lines):
 
         # Check for existing '# crumb:'
         if "# crumb:" in stripped:
-            return None  # Skip; already present
+            if replace:
+                return i  # Return existing index for replacement
+            else:
+                return None  # Skip; already present
 
         # Check for shebang
         if i == 0 and stripped.startswith("#!"):
@@ -158,18 +173,24 @@ def find_insertion_index(lines):
 
     return insertion_index
 
-def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backup_ext=None, use_absolute=False):
+def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backup_ext=None, use_absolute=False, replace=False, use_unix=False):
     """
     Insert the line '# crumb: path' at the appropriate place
     if the file doesn't already have it in the top portion.
     Path can be relative or absolute based on the use_absolute parameter.
     Optionally creates a backup file before modifying.
+    When replace=True, replace any existing crumb tag instead of skipping the file.
+    When use_unix=True, use Unix-style path separators (/) even on Windows.
     Returns True if we modified the file, else False.
     """
     if use_absolute:
         path = os.path.abspath(file_path)
     else:
         path = os.path.relpath(file_path, start_dir)
+        
+    # Convert backslashes to forward slashes if requested
+    if use_unix and os.sep == '\\':
+        path = path.replace('\\', '/')
 
     try:
         with io.open(file_path, "r", encoding="utf-8") as f:
@@ -182,12 +203,43 @@ def insert_path_marker(file_path, start_dir, dry_run=False, verbose=False, backu
         logger.info(f"Skipping {file_path}: empty file.")
         return False
 
-    idx = find_insertion_index(lines)
+    idx = find_insertion_index(lines, replace=replace)
     if idx is None:
-        logger.info(f"Skipping {file_path}: already has marker or no insertion point.")
+        logger.info(f"Skipping {file_path}: already has marker and replace=False.")
         return False
 
     marker_line = f"# crumb: {path}\n"
+    if verbose:
+        if replace and any("# crumb:" in line for line in lines):
+            logger.debug(f"Replacing marker in {file_path} at line {idx} (dry_run={dry_run}).")
+        else:
+            logger.debug(f"Inserting marker into {file_path} at line {idx} (dry_run={dry_run}).")
+
+    if not dry_run:
+        if backup_ext:
+            backup_path = file_path + backup_ext
+            try:
+                shutil.copy(file_path, backup_path)
+                if verbose:
+                    logger.info(f"Created backup: {backup_path}")
+            except Exception as e:
+                logger.error(f"Failed to create backup for {file_path}: {e}")
+                return False
+
+        # Replace or insert the marker line
+        if replace and any("# crumb:" in line for line in lines):
+            lines[idx] = marker_line  # Replace existing marker
+        else:
+            lines.insert(idx, marker_line)  # Insert new marker
+            
+        try:
+            with io.open(file_path, "w", encoding="utf-8") as f:
+                f.writelines(lines)
+        except Exception as e:
+            logger.error(f"Failed to write {file_path}: {e}")
+            return False
+
+    return True
     if verbose:
         logger.debug(f"Inserting marker into {file_path} at line {idx} (dry_run={dry_run}).")
 
@@ -226,6 +278,10 @@ def main():
         logger.setLevel(logging.DEBUG)
         if args.absolute:
             logger.debug("Using absolute paths for crumb tags.")
+        if args.replace:
+            logger.debug("Will replace existing crumb tags.")
+        if args.unix:
+            logger.debug("Using Unix-style path separators.")
 
     # Set up the list of file extensions to process
     extensions = [".py"]  # Always include Python files
@@ -240,6 +296,7 @@ def main():
 
     updated_count = 0
     skipped_count = 0
+    replaced_count = 0
     total_files = 0
 
     for root, dirs, files in os.walk(start_dir):
@@ -257,14 +314,62 @@ def main():
                 skipped_count += 1
                 continue
 
+            # Track if file had existing crumb tag before modification
+            had_crumb = False
+            try:
+                with io.open(file_path, "r", encoding="utf-8") as f:
+                    had_crumb = any("# crumb:" in line for line in f.readlines())
+            except Exception:
+                pass  # Will be handled by insert_path_marker
+
             modified = insert_path_marker(
                 file_path=file_path,
                 start_dir=start_dir,
                 dry_run=args.dry_run,
                 verbose=args.verbose,
                 backup_ext=args.backup,
-                use_absolute=args.absolute
+                use_absolute=args.absolute,
+                replace=args.replace,
+                use_unix=args.unix
             )
+            
+            if modified:
+                if had_crumb and args.replace:
+                    replaced_count += 1
+                else:
+                    updated_count += 1
+            else:
+                skipped_count += 1
+
+    # Summary
+    logger.info("\n=== Summary ===")
+    logger.info(f"Total files considered: {total_files}")
+    logger.info(f"Files updated: {updated_count}")
+    if args.replace:
+        logger.info(f"Files with replaced crumb tags: {replaced_count}")
+    logger.info(f"Files skipped: {skipped_count}")
+    if args.dry_run:
+        logger.info("Dry run mode was ON (no files were actually modified).")
+
+            
+            if modified:
+                if had_crumb and args.replace:
+                    replaced_count += 1
+                else:
+                    updated_count += 1
+            else:
+                skipped_count += 1
+
+    # Summary
+    logger.info("\n=== Summary ===")
+    logger.info(f"Total files considered: {total_files}")
+    logger.info(f"Files updated: {updated_count}")
+    if args.replace:
+        logger.info(f"Files with replaced crumb tags: {replaced_count}")
+    logger.info(f"Files skipped: {skipped_count}")
+    if args.dry_run:
+        logger.info("Dry run mode was ON (no files were actually modified).")
+
             if modified:
                 updated_count += 1
             else:
